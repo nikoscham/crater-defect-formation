@@ -9,7 +9,7 @@ clear all
 global Ht L co so sinf Akink B Mc eo G1 xo Tscale cdry A d dr dt;
 
 %%%
-%%% Model Parameters
+%%% Define model Parameters
 %%%
 Ht = 0.003; %%% Initial film thickness (cm)
 L = 0.025; %%% Horizontal length scale (cm)
@@ -33,20 +33,20 @@ A = (3.0/2.0)*(so-sinf)/so*(L/Ht)^2; %%% Dimensionless aspect ratio
 E = Tscale*eo/Ht;
 dryt = (1.0-co)/E %%% Drying time (s)
 cdry = 0.995; %%% Dry resin concentration
-dryt = 15;
+dryt = 15; %%% Simulation time
 
 %%%
 %%% Set up the mesh
 %%%
-N = 200;
-rend = 12.0;
+N = 200; %%% Number of nodes
+rend = 12.0; %%% max r
 r = linspace(0,rend,N+1)';
 %r = rend*pow2(0:-0.1:-10)';
 dr = rend/real(N);
-hjac = 1.0e-4*dr; %%% Used for jacobian calc
+hjac = 1.0e-4*dr; %%% Used for Jacobian calculation
 
 %%%
-%%% Set up time step
+%%% Define time step
 %%%
 dt = 1.0e-4;
 
@@ -57,14 +57,14 @@ k = 1;
 t(k)=0;
 disp ('Time step:'), disp(k)
 disp ('Time (s):'), disp(t(k)*Tscale)
-Amat = sparse(3*N+3,3*N+3);
+Amat = sparse(3*N+3,3*N+3); %%% Jacobian matrix
 for i = 1:N+1
   h(i,1) = 1.0; %%% Film thickness
   c(i,1) = co; %%% Resin concentration
   hr(i,1) = c(i,1)*h(i,1); %%% Resin depth
-%  G(i,1) = 1.0/(0.1+(r(i)/L)); %%% Surfactant concentration
-  G(i,1) = (1.0-erf((r(i)-1.0)*2.5))/2.0; %%% Surfactant concentration
-%  G(i,1) =  G0*exp(-(r(i)/L)^2); %%% Surfactant concentration
+%  G(i,1) = 1.0/(0.1+(r(i)/L)); %%% Initial surfactant concentration
+  G(i,1) = (1.0-erf((r(i)-1.0)*2.5))/2.0; %%% Initial surfactant concentration (given by an error function)
+%  G(i,1) =  G0*exp(-(r(i)/L)^2); %%% Initial surfactant concentration (given by an exponential function)
 end
 G(1,1) = G(2,1); %%% Surfactant concentration
 
@@ -76,8 +76,8 @@ while ((t(k)*Tscale) <= dryt) %%% Loop over time
   
   for i = 1:N+1  %%% Solution guessing
     h(i,k) = h(i,k-1);
-	G(i,k) = G(i,k-1);
-	hr(i,k) = hr(i,k-1);
+    G(i,k) = G(i,k-1);
+    hr(i,k) = hr(i,k-1);
     c(i,k) = hr(i,k)./h(i,k);
   end
 
@@ -87,8 +87,8 @@ while ((t(k)*Tscale) <= dryt) %%% Loop over time
   newtonerror = 1.0;
   while (newtonerror >= 1e-6)
 
-	Amat(:,:) = 0.0;
-	equ = 1; %%% Film thickness Evolution
+    Amat(:,:) = 0.0; %%% Initialize Jacobian matrix
+    equ = 1; %%% Equation 1 - Film thickness Evolution
     for i = 2:N %%% Loop over space
 
       if (i == 2) %%% Semi-forward differences
@@ -108,7 +108,7 @@ while ((t(k)*Tscale) <= dryt) %%% Loop over time
         Amat(i,2*N+2+i+1) = (rescomp2(h(i,k), G(i,k), hr(i,k), h(i-1,k), G(i-1,k), hr(i-1,k), h(i+1,k), G(i+1,k), hr(i+1,k)+hjac, r(i), h(i,k-1), G(i,k-1), hr(i,k-1), h(i+4,k), h(i+3,k), h(i+2,k), equ) - rescomp2(h(i,k), G(i,k), hr(i,k), h(i-1,k), G(i-1,k), hr(i-1,k), h(i+1,k), G(i+1,k), hr(i+1,k)-hjac, r(i), h(i,k-1), G(i,k-1), hr(i,k-1), h(i+4,k), h(i+3,k), h(i+2,k), equ))/(2.0*hjac);
         Amat(i,2*N+2+i-1) = (rescomp2(h(i,k), G(i,k), hr(i,k), h(i-1,k), G(i-1,k), hr(i-1,k)+hjac, h(i+1,k), G(i+1,k), hr(i+1,k), r(i), h(i,k-1), G(i,k-1), hr(i,k-1), h(i+4,k), h(i+3,k), h(i+2,k), equ) - rescomp2(h(i,k), G(i,k), hr(i,k), h(i-1,k), G(i-1,k), hr(i-1,k)-hjac, h(i+1,k), G(i+1,k), hr(i+1,k), r(i), h(i,k-1), G(i,k-1), hr(i,k-1), h(i+4,k), h(i+3,k), h(i+2,k), equ))/(2.0*hjac);
 
-	  elseif (i == N) %%% Semi-backward differences
+      elseif (i == N) %%% Semi-backward differences
         [res(i,k)] = rescompn(h(i,k), G(i,k), hr(i,k), h(i-1,k), G(i-1,k), hr(i-1,k), h(i+1,k), G(i+1,k), hr(i+1,k), r(i), h(i,k-1), G(i,k-1), hr(i,k-1), h(i-4,k), h(i-3,k), h(i-2,k), equ);
         Amat(i,i) = (rescompn(h(i,k)+hjac, G(i,k), hr(i,k), h(i-1,k), G(i-1,k), hr(i-1,k), h(i+1,k), G(i+1,k), hr(i+1,k), r(i), h(i,k-1), G(i,k-1), hr(i,k-1), h(i-4,k), h(i-3,k), h(i-2,k), equ)-rescompn(h(i,k)-hjac, G(i,k), hr(i,k), h(i-1,k), G(i-1,k), hr(i-1,k), h(i+1,k), G(i+1,k), hr(i+1,k), r(i), h(i,k-1), G(i,k-1), hr(i,k-1), h(i-4,k), h(i-3,k), h(i-2,k), equ))/(2.0*hjac);
         Amat(i,i-1) = (rescompn(h(i,k), G(i,k), hr(i,k), h(i-1,k)+hjac, G(i-1,k), hr(i-1,k), h(i+1,k), G(i+1,k), hr(i+1,k), r(i), h(i,k-1), G(i,k-1), hr(i,k-1), h(i-4,k), h(i-3,k), h(i-2,k), equ)-rescompn(h(i,k), G(i,k), hr(i,k), h(i-1,k)-hjac, G(i-1,k), hr(i-1,k), h(i+1,k), G(i+1,k), hr(i+1,k), r(i), h(i,k-1), G(i,k-1), hr(i,k-1), h(i-4,k), h(i-3,k), h(i-2,k), equ))/(2.0*hjac);
@@ -125,27 +125,27 @@ while ((t(k)*Tscale) <= dryt) %%% Loop over time
         Amat(i,2*N+2+i-1) = (rescompn(h(i,k), G(i,k), hr(i,k), h(i-1,k), G(i-1,k), hr(i-1,k)+hjac, h(i+1,k), G(i+1,k), hr(i+1,k), r(i), h(i,k-1), G(i,k-1), hr(i,k-1), h(i-4,k), h(i-3,k), h(i-2,k), equ)-rescompn(h(i,k), G(i,k), hr(i,k), h(i-1,k), G(i-1,k), hr(i-1,k)-hjac, h(i+1,k), G(i+1,k), hr(i+1,k), r(i), h(i,k-1), G(i,k-1), hr(i,k-1), h(i-4,k), h(i-3,k), h(i-2,k), equ))/(2.0*hjac);
         Amat(i,2*N+2+i+1) = (rescompn(h(i,k), G(i,k), hr(i,k), h(i-1,k), G(i-1,k), hr(i-1,k), h(i+1,k), G(i+1,k), hr(i+1,k)+hjac, r(i), h(i,k-1), G(i,k-1), hr(i,k-1), h(i-4,k), h(i-3,k), h(i-2,k), equ)-rescompn(h(i,k), G(i,k), hr(i,k), h(i-1,k), G(i-1,k), hr(i-1,k), h(i+1,k), G(i+1,k), hr(i+1,k)-hjac, r(i), h(i,k-1), G(i,k-1), hr(i,k-1), h(i-4,k), h(i-3,k), h(i-2,k), equ))/(2.0*hjac);
 		
-	  else %%% Central differences
+      else %%% Central differences
         [res(i,k)] = rescomp(h(i,k), G(i,k), hr(i,k), h(i-1,k), G(i-1,k), hr(i-1,k), h(i+1,k), G(i+1,k), hr(i+1,k), r(i), h(i,k-1), G(i,k-1), hr(i,k-1), h(i-2,k), h(i+2,k), equ);
         Amat(i,i) = (rescomp(h(i,k)+hjac, G(i,k), hr(i,k), h(i-1,k), G(i-1,k), hr(i-1,k), h(i+1,k), G(i+1,k), hr(i+1,k), r(i), h(i,k-1), G(i,k-1), hr(i,k-1), h(i-2,k), h(i+2,k), equ) - rescomp(h(i,k)-hjac, G(i,k), hr(i,k), h(i-1,k), G(i-1,k), hr(i-1,k), h(i+1,k), G(i+1,k), hr(i+1,k), r(i), h(i,k-1), G(i,k-1), hr(i,k-1), h(i-2,k), h(i+2,k), equ))/(2.0*hjac);
-		Amat(i,i+1) = (rescomp(h(i,k), G(i,k), hr(i,k), h(i-1,k), G(i-1,k), hr(i-1,k), h(i+1,k)+hjac, G(i+1,k), hr(i+1,k), r(i), h(i,k-1), G(i,k-1), hr(i,k-1), h(i-2,k), h(i+2,k), equ) - rescomp(h(i,k), G(i,k), hr(i,k), h(i-1,k), G(i-1,k), hr(i-1,k), h(i+1,k)-hjac, G(i+1,k), hr(i+1,k), r(i), h(i,k-1), G(i,k-1), hr(i,k-1), h(i-2,k), h(i+2,k), equ))/(2.0*hjac);
-		Amat(i,i+2) = (rescomp(h(i,k), G(i,k), hr(i,k), h(i-1,k), G(i-1,k), hr(i-1,k), h(i+1,k), G(i+1,k), hr(i+1,k), r(i), h(i,k-1), G(i,k-1), hr(i,k-1), h(i-2,k), h(i+2,k)+hjac, equ) - rescomp(h(i,k), G(i,k), hr(i,k), h(i-1,k), G(i-1,k), hr(i-1,k), h(i+1,k), G(i+1,k), hr(i+1,k), r(i), h(i,k-1), G(i,k-1), hr(i,k-1), h(i-2,k), h(i+2,k)-hjac, equ))/(2.0*hjac);
-		Amat(i,i-1) = (rescomp(h(i,k), G(i,k), hr(i,k), h(i-1,k)+hjac, G(i-1,k), hr(i-1,k), h(i+1,k), G(i+1,k), hr(i+1,k), r(i), h(i,k-1), G(i,k-1), hr(i,k-1), h(i-2,k), h(i+2,k), equ) - rescomp(h(i,k), G(i,k), hr(i,k), h(i-1,k)-hjac, G(i-1,k), hr(i-1,k), h(i+1,k), G(i+1,k), hr(i+1,k), r(i), h(i,k-1), G(i,k-1), hr(i,k-1), h(i-2,k), h(i+2,k), equ))/(2.0*hjac);
-		Amat(i,i-2) = (rescomp(h(i,k), G(i,k), hr(i,k), h(i-1,k), G(i-1,k), hr(i-1,k), h(i+1,k), G(i+1,k), hr(i+1,k), r(i), h(i,k-1), G(i,k-1), hr(i,k-1), h(i-2,k)+hjac, h(i+2,k), equ) - rescomp(h(i,k), G(i,k), hr(i,k), h(i-1,k), G(i-1,k), hr(i-1,k), h(i+1,k), G(i+1,k), hr(i+1,k), r(i), h(i,k-1), G(i,k-1), hr(i,k-1), h(i-2,k)-hjac, h(i+2,k), equ))/(2.0*hjac);
+        Amat(i,i+1) = (rescomp(h(i,k), G(i,k), hr(i,k), h(i-1,k), G(i-1,k), hr(i-1,k), h(i+1,k)+hjac, G(i+1,k), hr(i+1,k), r(i), h(i,k-1), G(i,k-1), hr(i,k-1), h(i-2,k), h(i+2,k), equ) - rescomp(h(i,k), G(i,k), hr(i,k), h(i-1,k), G(i-1,k), hr(i-1,k), h(i+1,k)-hjac, G(i+1,k), hr(i+1,k), r(i), h(i,k-1), G(i,k-1), hr(i,k-1), h(i-2,k), h(i+2,k), equ))/(2.0*hjac);
+        Amat(i,i+2) = (rescomp(h(i,k), G(i,k), hr(i,k), h(i-1,k), G(i-1,k), hr(i-1,k), h(i+1,k), G(i+1,k), hr(i+1,k), r(i), h(i,k-1), G(i,k-1), hr(i,k-1), h(i-2,k), h(i+2,k)+hjac, equ) - rescomp(h(i,k), G(i,k), hr(i,k), h(i-1,k), G(i-1,k), hr(i-1,k), h(i+1,k), G(i+1,k), hr(i+1,k), r(i), h(i,k-1), G(i,k-1), hr(i,k-1), h(i-2,k), h(i+2,k)-hjac, equ))/(2.0*hjac);
+        Amat(i,i-1) = (rescomp(h(i,k), G(i,k), hr(i,k), h(i-1,k)+hjac, G(i-1,k), hr(i-1,k), h(i+1,k), G(i+1,k), hr(i+1,k), r(i), h(i,k-1), G(i,k-1), hr(i,k-1), h(i-2,k), h(i+2,k), equ) - rescomp(h(i,k), G(i,k), hr(i,k), h(i-1,k)-hjac, G(i-1,k), hr(i-1,k), h(i+1,k), G(i+1,k), hr(i+1,k), r(i), h(i,k-1), G(i,k-1), hr(i,k-1), h(i-2,k), h(i+2,k), equ))/(2.0*hjac);
+        Amat(i,i-2) = (rescomp(h(i,k), G(i,k), hr(i,k), h(i-1,k), G(i-1,k), hr(i-1,k), h(i+1,k), G(i+1,k), hr(i+1,k), r(i), h(i,k-1), G(i,k-1), hr(i,k-1), h(i-2,k)+hjac, h(i+2,k), equ) - rescomp(h(i,k), G(i,k), hr(i,k), h(i-1,k), G(i-1,k), hr(i-1,k), h(i+1,k), G(i+1,k), hr(i+1,k), r(i), h(i,k-1), G(i,k-1), hr(i,k-1), h(i-2,k)-hjac, h(i+2,k), equ))/(2.0*hjac);
 		
         Amat(i,N+1+i) = (rescomp(h(i,k), G(i,k)+hjac, hr(i,k), h(i-1,k), G(i-1,k), hr(i-1,k), h(i+1,k), G(i+1,k), hr(i+1,k), r(i), h(i,k-1), G(i,k-1), hr(i,k-1), h(i-2,k), h(i+2,k), equ) - rescomp(h(i,k), G(i,k)-hjac, hr(i,k), h(i-1,k), G(i-1,k), hr(i-1,k), h(i+1,k), G(i+1,k), hr(i+1,k), r(i), h(i,k-1), G(i,k-1), hr(i,k-1), h(i-2,k), h(i+2,k), equ))/(2.0*hjac);
-		Amat(i,N+1+i+1) = (rescomp(h(i,k), G(i,k), hr(i,k), h(i-1,k), G(i-1,k), hr(i-1,k), h(i+1,k), G(i+1,k)+hjac, hr(i+1,k), r(i), h(i,k-1), G(i,k-1), hr(i,k-1), h(i-2,k), h(i+2,k), equ) - rescomp(h(i,k), G(i,k), hr(i,k), h(i-1,k), G(i-1,k), hr(i-1,k), h(i+1,k), G(i+1,k)-hjac, hr(i+1,k), r(i), h(i,k-1), G(i,k-1), hr(i,k-1), h(i-2,k), h(i+2,k), equ))/(2.0*hjac);
-		Amat(i,N+1+i-1) = (rescomp(h(i,k), G(i,k), hr(i,k), h(i-1,k), G(i-1,k)+hjac, hr(i-1,k), h(i+1,k), G(i+1,k), hr(i+1,k), r(i), h(i,k-1), G(i,k-1), hr(i,k-1), h(i-2,k), h(i+2,k), equ) - rescomp(h(i,k), G(i,k), hr(i,k), h(i-1,k), G(i-1,k)-hjac, hr(i-1,k), h(i+1,k), G(i+1,k), hr(i+1,k), r(i), h(i,k-1), G(i,k-1), hr(i,k-1), h(i-2,k), h(i+2,k), equ))/(2.0*hjac);
+        Amat(i,N+1+i+1) = (rescomp(h(i,k), G(i,k), hr(i,k), h(i-1,k), G(i-1,k), hr(i-1,k), h(i+1,k), G(i+1,k)+hjac, hr(i+1,k), r(i), h(i,k-1), G(i,k-1), hr(i,k-1), h(i-2,k), h(i+2,k), equ) - rescomp(h(i,k), G(i,k), hr(i,k), h(i-1,k), G(i-1,k), hr(i-1,k), h(i+1,k), G(i+1,k)-hjac, hr(i+1,k), r(i), h(i,k-1), G(i,k-1), hr(i,k-1), h(i-2,k), h(i+2,k), equ))/(2.0*hjac);
+        Amat(i,N+1+i-1) = (rescomp(h(i,k), G(i,k), hr(i,k), h(i-1,k), G(i-1,k)+hjac, hr(i-1,k), h(i+1,k), G(i+1,k), hr(i+1,k), r(i), h(i,k-1), G(i,k-1), hr(i,k-1), h(i-2,k), h(i+2,k), equ) - rescomp(h(i,k), G(i,k), hr(i,k), h(i-1,k), G(i-1,k)-hjac, hr(i-1,k), h(i+1,k), G(i+1,k), hr(i+1,k), r(i), h(i,k-1), G(i,k-1), hr(i,k-1), h(i-2,k), h(i+2,k), equ))/(2.0*hjac);
 		
         Amat(i,2*N+2+i) = (rescomp(h(i,k), G(i,k), hr(i,k)+hjac, h(i-1,k), G(i-1,k), hr(i-1,k), h(i+1,k), G(i+1,k), hr(i+1,k), r(i), h(i,k-1), G(i,k-1), hr(i,k-1), h(i-2,k), h(i+2,k), equ) - rescomp(h(i,k), G(i,k), hr(i,k)-hjac, h(i-1,k), G(i-1,k), hr(i-1,k), h(i+1,k), G(i+1,k), hr(i+1,k), r(i), h(i,k-1), G(i,k-1), hr(i,k-1), h(i-2,k), h(i+2,k), equ))/(2.0*hjac);
-		Amat(i,2*N+2+i+1) = (rescomp(h(i,k), G(i,k), hr(i,k), h(i-1,k), G(i-1,k), hr(i-1,k), h(i+1,k), G(i+1,k), hr(i+1,k)+hjac, r(i), h(i,k-1), G(i,k-1), hr(i,k-1), h(i-2,k), h(i+2,k), equ) - rescomp(h(i,k), G(i,k), hr(i,k), h(i-1,k), G(i-1,k), hr(i-1,k), h(i+1,k), G(i+1,k), hr(i+1,k)-hjac, r(i), h(i,k-1), G(i,k-1), hr(i,k-1), h(i-2,k), h(i+2,k), equ))/(2.0*hjac);
-		Amat(i,2*N+2+i-1) = (rescomp(h(i,k), G(i,k), hr(i,k), h(i-1,k), G(i-1,k), hr(i-1,k)+hjac, h(i+1,k), G(i+1,k), hr(i+1,k), r(i), h(i,k-1), G(i,k-1), hr(i,k-1), h(i-2,k), h(i+2,k), equ) - rescomp(h(i,k), G(i,k), hr(i,k), h(i-1,k), G(i-1,k), hr(i-1,k)-hjac, h(i+1,k), G(i+1,k), hr(i+1,k), r(i), h(i,k-1), G(i,k-1), hr(i,k-1), h(i-2,k), h(i+2,k), equ))/(2.0*hjac);
-	  end
+        Amat(i,2*N+2+i+1) = (rescomp(h(i,k), G(i,k), hr(i,k), h(i-1,k), G(i-1,k), hr(i-1,k), h(i+1,k), G(i+1,k), hr(i+1,k)+hjac, r(i), h(i,k-1), G(i,k-1), hr(i,k-1), h(i-2,k), h(i+2,k), equ) - rescomp(h(i,k), G(i,k), hr(i,k), h(i-1,k), G(i-1,k), hr(i-1,k), h(i+1,k), G(i+1,k), hr(i+1,k)-hjac, r(i), h(i,k-1), G(i,k-1), hr(i,k-1), h(i-2,k), h(i+2,k), equ))/(2.0*hjac);
+        Amat(i,2*N+2+i-1) = (rescomp(h(i,k), G(i,k), hr(i,k), h(i-1,k), G(i-1,k), hr(i-1,k)+hjac, h(i+1,k), G(i+1,k), hr(i+1,k), r(i), h(i,k-1), G(i,k-1), hr(i,k-1), h(i-2,k), h(i+2,k), equ) - rescomp(h(i,k), G(i,k), hr(i,k), h(i-1,k), G(i-1,k), hr(i-1,k)-hjac, h(i+1,k), G(i+1,k), hr(i+1,k), r(i), h(i,k-1), G(i,k-1), hr(i,k-1), h(i-2,k), h(i+2,k), equ))/(2.0*hjac);
+      end
 	
     end
 	
-	equ = 2; %%% Surfactant concentration
-	i = 2;
+    equ = 2; %%% Equation 2 - Surfactant concentration
+    i = 2;
     for jj = (N+3):(2*N+1) %%% Loop over space
 	
       if (i == 2) %%% Semi-forward differences
@@ -165,7 +165,7 @@ while ((t(k)*Tscale) <= dryt) %%% Loop over time
         Amat(jj,2*N+2+i+1) = (rescomp2(h(i,k), G(i,k), hr(i,k), h(i-1,k), G(i-1,k), hr(i-1,k), h(i+1,k), G(i+1,k), hr(i+1,k)+hjac, r(i), h(i,k-1), G(i,k-1), hr(i,k-1), h(i+4,k), h(i+3,k), h(i+2,k), equ) - rescomp2(h(i,k), G(i,k), hr(i,k), h(i-1,k), G(i-1,k), hr(i-1,k), h(i+1,k), G(i+1,k), hr(i+1,k)-hjac, r(i), h(i,k-1), G(i,k-1), hr(i,k-1), h(i+4,k), h(i+3,k), h(i+2,k), equ))/(2.0*hjac);
         Amat(jj,2*N+2+i-1) = (rescomp2(h(i,k), G(i,k), hr(i,k), h(i-1,k), G(i-1,k), hr(i-1,k)+hjac, h(i+1,k), G(i+1,k), hr(i+1,k), r(i), h(i,k-1), G(i,k-1), hr(i,k-1), h(i+4,k), h(i+3,k), h(i+2,k), equ) - rescomp2(h(i,k), G(i,k), hr(i,k), h(i-1,k), G(i-1,k), hr(i-1,k)-hjac, h(i+1,k), G(i+1,k), hr(i+1,k), r(i), h(i,k-1), G(i,k-1), hr(i,k-1), h(i+4,k), h(i+3,k), h(i+2,k), equ))/(2.0*hjac);
 
-	  elseif (i == N) %%% Semi-backward differences
+      elseif (i == N) %%% Semi-backward differences
         [res(jj,k)] = rescompn(h(i,k), G(i,k), hr(i,k), h(i-1,k), G(i-1,k), hr(i-1,k), h(i+1,k), G(i+1,k), hr(i+1,k), r(i), h(i,k-1), G(i,k-1), hr(i,k-1), h(i-4,k), h(i-3,k), h(i-2,k), equ);
         Amat(jj,i) = (rescompn(h(i,k)+hjac, G(i,k), hr(i,k), h(i-1,k), G(i-1,k), hr(i-1,k), h(i+1,k), G(i+1,k), hr(i+1,k), r(i), h(i,k-1), G(i,k-1), hr(i,k-1), h(i-4,k), h(i-3,k), h(i-2,k), equ)-rescompn(h(i,k)-hjac, G(i,k), hr(i,k), h(i-1,k), G(i-1,k), hr(i-1,k), h(i+1,k), G(i+1,k), hr(i+1,k), r(i), h(i,k-1), G(i,k-1), hr(i,k-1), h(i-4,k), h(i-3,k), h(i-2,k), equ))/(2.0*hjac);
         Amat(jj,i-1) = (rescompn(h(i,k), G(i,k), hr(i,k), h(i-1,k)+hjac, G(i-1,k), hr(i-1,k), h(i+1,k), G(i+1,k), hr(i+1,k), r(i), h(i,k-1), G(i,k-1), hr(i,k-1), h(i-4,k), h(i-3,k), h(i-2,k), equ)-rescompn(h(i,k), G(i,k), hr(i,k), h(i-1,k)-hjac, G(i-1,k), hr(i-1,k), h(i+1,k), G(i+1,k), hr(i+1,k), r(i), h(i,k-1), G(i,k-1), hr(i,k-1), h(i-4,k), h(i-3,k), h(i-2,k), equ))/(2.0*hjac);
@@ -182,28 +182,28 @@ while ((t(k)*Tscale) <= dryt) %%% Loop over time
         Amat(jj,2*N+2+i-1) = (rescompn(h(i,k), G(i,k), hr(i,k), h(i-1,k), G(i-1,k), hr(i-1,k)+hjac, h(i+1,k), G(i+1,k), hr(i+1,k), r(i), h(i,k-1), G(i,k-1), hr(i,k-1), h(i-4,k), h(i-3,k), h(i-2,k), equ)-rescompn(h(i,k), G(i,k), hr(i,k), h(i-1,k), G(i-1,k), hr(i-1,k)-hjac, h(i+1,k), G(i+1,k), hr(i+1,k), r(i), h(i,k-1), G(i,k-1), hr(i,k-1), h(i-4,k), h(i-3,k), h(i-2,k), equ))/(2.0*hjac);
         Amat(jj,2*N+2+i+1) = (rescompn(h(i,k), G(i,k), hr(i,k), h(i-1,k), G(i-1,k), hr(i-1,k), h(i+1,k), G(i+1,k), hr(i+1,k)+hjac, r(i), h(i,k-1), G(i,k-1), hr(i,k-1), h(i-4,k), h(i-3,k), h(i-2,k), equ)-rescompn(h(i,k), G(i,k), hr(i,k), h(i-1,k), G(i-1,k), hr(i-1,k), h(i+1,k), G(i+1,k), hr(i+1,k)-hjac, r(i), h(i,k-1), G(i,k-1), hr(i,k-1), h(i-4,k), h(i-3,k), h(i-2,k), equ))/(2.0*hjac);
 		
-	  else %%% Central differences
+      else %%% Central differences
         [res(jj,k)] = rescomp(h(i,k), G(i,k), hr(i,k), h(i-1,k), G(i-1,k), hr(i-1,k), h(i+1,k), G(i+1,k), hr(i+1,k), r(i), h(i,k-1), G(i,k-1), hr(i,k-1), h(i-2,k), h(i+2,k), equ);
         Amat(jj,i) = (rescomp(h(i,k)+hjac, G(i,k), hr(i,k), h(i-1,k), G(i-1,k), hr(i-1,k), h(i+1,k), G(i+1,k), hr(i+1,k), r(i), h(i,k-1), G(i,k-1), hr(i,k-1), h(i-2,k), h(i+2,k), equ) - rescomp(h(i,k)-hjac, G(i,k), hr(i,k), h(i-1,k), G(i-1,k), hr(i-1,k), h(i+1,k), G(i+1,k), hr(i+1,k), r(i), h(i,k-1), G(i,k-1), hr(i,k-1), h(i-2,k), h(i+2,k), equ))/(2.0*hjac);
-		Amat(jj,i+1) = (rescomp(h(i,k), G(i,k), hr(i,k), h(i-1,k), G(i-1,k), hr(i-1,k), h(i+1,k)+hjac, G(i+1,k), hr(i+1,k), r(i), h(i,k-1), G(i,k-1), hr(i,k-1), h(i-2,k), h(i+2,k), equ) - rescomp(h(i,k), G(i,k), hr(i,k), h(i-1,k), G(i-1,k), hr(i-1,k), h(i+1,k)-hjac, G(i+1,k), hr(i+1,k), r(i), h(i,k-1), G(i,k-1), hr(i,k-1), h(i-2,k), h(i+2,k), equ))/(2.0*hjac);
-		Amat(jj,i+2) = (rescomp(h(i,k), G(i,k), hr(i,k), h(i-1,k), G(i-1,k), hr(i-1,k), h(i+1,k), G(i+1,k), hr(i+1,k), r(i), h(i,k-1), G(i,k-1), hr(i,k-1), h(i-2,k), h(i+2,k)+hjac, equ) - rescomp(h(i,k), G(i,k), hr(i,k), h(i-1,k), G(i-1,k), hr(i-1,k), h(i+1,k), G(i+1,k), hr(i+1,k), r(i), h(i,k-1), G(i,k-1), hr(i,k-1), h(i-2,k), h(i+2,k)-hjac, equ))/(2.0*hjac);
-		Amat(jj,i-1) = (rescomp(h(i,k), G(i,k), hr(i,k), h(i-1,k)+hjac, G(i-1,k), hr(i-1,k), h(i+1,k), G(i+1,k), hr(i+1,k), r(i), h(i,k-1), G(i,k-1), hr(i,k-1), h(i-2,k), h(i+2,k), equ) - rescomp(h(i,k), G(i,k), hr(i,k), h(i-1,k)-hjac, G(i-1,k), hr(i-1,k), h(i+1,k), G(i+1,k), hr(i+1,k), r(i), h(i,k-1), G(i,k-1), hr(i,k-1), h(i-2,k), h(i+2,k), equ))/(2.0*hjac);
-		Amat(jj,i-2) = (rescomp(h(i,k), G(i,k), hr(i,k), h(i-1,k), G(i-1,k), hr(i-1,k), h(i+1,k), G(i+1,k), hr(i+1,k), r(i), h(i,k-1), G(i,k-1), hr(i,k-1), h(i-2,k)+hjac, h(i+2,k), equ) - rescomp(h(i,k), G(i,k), hr(i,k), h(i-1,k), G(i-1,k), hr(i-1,k), h(i+1,k), G(i+1,k), hr(i+1,k), r(i), h(i,k-1), G(i,k-1), hr(i,k-1), h(i-2,k)-hjac, h(i+2,k), equ))/(2.0*hjac);
+        Amat(jj,i+1) = (rescomp(h(i,k), G(i,k), hr(i,k), h(i-1,k), G(i-1,k), hr(i-1,k), h(i+1,k)+hjac, G(i+1,k), hr(i+1,k), r(i), h(i,k-1), G(i,k-1), hr(i,k-1), h(i-2,k), h(i+2,k), equ) - rescomp(h(i,k), G(i,k), hr(i,k), h(i-1,k), G(i-1,k), hr(i-1,k), h(i+1,k)-hjac, G(i+1,k), hr(i+1,k), r(i), h(i,k-1), G(i,k-1), hr(i,k-1), h(i-2,k), h(i+2,k), equ))/(2.0*hjac);
+        Amat(jj,i+2) = (rescomp(h(i,k), G(i,k), hr(i,k), h(i-1,k), G(i-1,k), hr(i-1,k), h(i+1,k), G(i+1,k), hr(i+1,k), r(i), h(i,k-1), G(i,k-1), hr(i,k-1), h(i-2,k), h(i+2,k)+hjac, equ) - rescomp(h(i,k), G(i,k), hr(i,k), h(i-1,k), G(i-1,k), hr(i-1,k), h(i+1,k), G(i+1,k), hr(i+1,k), r(i), h(i,k-1), G(i,k-1), hr(i,k-1), h(i-2,k), h(i+2,k)-hjac, equ))/(2.0*hjac);
+        Amat(jj,i-1) = (rescomp(h(i,k), G(i,k), hr(i,k), h(i-1,k)+hjac, G(i-1,k), hr(i-1,k), h(i+1,k), G(i+1,k), hr(i+1,k), r(i), h(i,k-1), G(i,k-1), hr(i,k-1), h(i-2,k), h(i+2,k), equ) - rescomp(h(i,k), G(i,k), hr(i,k), h(i-1,k)-hjac, G(i-1,k), hr(i-1,k), h(i+1,k), G(i+1,k), hr(i+1,k), r(i), h(i,k-1), G(i,k-1), hr(i,k-1), h(i-2,k), h(i+2,k), equ))/(2.0*hjac);
+        Amat(jj,i-2) = (rescomp(h(i,k), G(i,k), hr(i,k), h(i-1,k), G(i-1,k), hr(i-1,k), h(i+1,k), G(i+1,k), hr(i+1,k), r(i), h(i,k-1), G(i,k-1), hr(i,k-1), h(i-2,k)+hjac, h(i+2,k), equ) - rescomp(h(i,k), G(i,k), hr(i,k), h(i-1,k), G(i-1,k), hr(i-1,k), h(i+1,k), G(i+1,k), hr(i+1,k), r(i), h(i,k-1), G(i,k-1), hr(i,k-1), h(i-2,k)-hjac, h(i+2,k), equ))/(2.0*hjac);
 		
         Amat(jj,N+1+i) = (rescomp(h(i,k), G(i,k)+hjac, hr(i,k), h(i-1,k), G(i-1,k), hr(i-1,k), h(i+1,k), G(i+1,k), hr(i+1,k), r(i), h(i,k-1), G(i,k-1), hr(i,k-1), h(i-2,k), h(i+2,k), equ) - rescomp(h(i,k), G(i,k)-hjac, hr(i,k), h(i-1,k), G(i-1,k), hr(i-1,k), h(i+1,k), G(i+1,k), hr(i+1,k), r(i), h(i,k-1), G(i,k-1), hr(i,k-1), h(i-2,k), h(i+2,k), equ))/(2.0*hjac);
-		Amat(jj,N+1+i+1) = (rescomp(h(i,k), G(i,k), hr(i,k), h(i-1,k), G(i-1,k), hr(i-1,k), h(i+1,k), G(i+1,k)+hjac, hr(i+1,k), r(i), h(i,k-1), G(i,k-1), hr(i,k-1), h(i-2,k), h(i+2,k), equ) - rescomp(h(i,k), G(i,k), hr(i,k), h(i-1,k), G(i-1,k), hr(i-1,k), h(i+1,k), G(i+1,k)-hjac, hr(i+1,k), r(i), h(i,k-1), G(i,k-1), hr(i,k-1), h(i-2,k), h(i+2,k), equ))/(2.0*hjac);
-		Amat(jj,N+1+i-1) = (rescomp(h(i,k), G(i,k), hr(i,k), h(i-1,k), G(i-1,k)+hjac, hr(i-1,k), h(i+1,k), G(i+1,k), hr(i+1,k), r(i), h(i,k-1), G(i,k-1), hr(i,k-1), h(i-2,k), h(i+2,k), equ) - rescomp(h(i,k), G(i,k), hr(i,k), h(i-1,k), G(i-1,k)-hjac, hr(i-1,k), h(i+1,k), G(i+1,k), hr(i+1,k), r(i), h(i,k-1), G(i,k-1), hr(i,k-1), h(i-2,k), h(i+2,k), equ))/(2.0*hjac);
+        Amat(jj,N+1+i+1) = (rescomp(h(i,k), G(i,k), hr(i,k), h(i-1,k), G(i-1,k), hr(i-1,k), h(i+1,k), G(i+1,k)+hjac, hr(i+1,k), r(i), h(i,k-1), G(i,k-1), hr(i,k-1), h(i-2,k), h(i+2,k), equ) - rescomp(h(i,k), G(i,k), hr(i,k), h(i-1,k), G(i-1,k), hr(i-1,k), h(i+1,k), G(i+1,k)-hjac, hr(i+1,k), r(i), h(i,k-1), G(i,k-1), hr(i,k-1), h(i-2,k), h(i+2,k), equ))/(2.0*hjac);
+        Amat(jj,N+1+i-1) = (rescomp(h(i,k), G(i,k), hr(i,k), h(i-1,k), G(i-1,k)+hjac, hr(i-1,k), h(i+1,k), G(i+1,k), hr(i+1,k), r(i), h(i,k-1), G(i,k-1), hr(i,k-1), h(i-2,k), h(i+2,k), equ) - rescomp(h(i,k), G(i,k), hr(i,k), h(i-1,k), G(i-1,k)-hjac, hr(i-1,k), h(i+1,k), G(i+1,k), hr(i+1,k), r(i), h(i,k-1), G(i,k-1), hr(i,k-1), h(i-2,k), h(i+2,k), equ))/(2.0*hjac);
 		
         Amat(jj,2*N+2+i) = (rescomp(h(i,k), G(i,k), hr(i,k)+hjac, h(i-1,k), G(i-1,k), hr(i-1,k), h(i+1,k), G(i+1,k), hr(i+1,k), r(i), h(i,k-1), G(i,k-1), hr(i,k-1), h(i-2,k), h(i+2,k), equ) - rescomp(h(i,k), G(i,k), hr(i,k)-hjac, h(i-1,k), G(i-1,k), hr(i-1,k), h(i+1,k), G(i+1,k), hr(i+1,k), r(i), h(i,k-1), G(i,k-1), hr(i,k-1), h(i-2,k), h(i+2,k), equ))/(2.0*hjac);
-		Amat(jj,2*N+2+i+1) = (rescomp(h(i,k), G(i,k), hr(i,k), h(i-1,k), G(i-1,k), hr(i-1,k), h(i+1,k), G(i+1,k), hr(i+1,k)+hjac, r(i), h(i,k-1), G(i,k-1), hr(i,k-1), h(i-2,k), h(i+2,k), equ) - rescomp(h(i,k), G(i,k), hr(i,k), h(i-1,k), G(i-1,k), hr(i-1,k), h(i+1,k), G(i+1,k), hr(i+1,k)-hjac, r(i), h(i,k-1), G(i,k-1), hr(i,k-1), h(i-2,k), h(i+2,k), equ))/(2.0*hjac);
-		Amat(jj,2*N+2+i-1) = (rescomp(h(i,k), G(i,k), hr(i,k), h(i-1,k), G(i-1,k), hr(i-1,k)+hjac, h(i+1,k), G(i+1,k), hr(i+1,k), r(i), h(i,k-1), G(i,k-1), hr(i,k-1), h(i-2,k), h(i+2,k), equ) - rescomp(h(i,k), G(i,k), hr(i,k), h(i-1,k), G(i-1,k), hr(i-1,k)-hjac, h(i+1,k), G(i+1,k), hr(i+1,k), r(i), h(i,k-1), G(i,k-1), hr(i,k-1), h(i-2,k), h(i+2,k), equ))/(2.0*hjac);
-	  end
-	  i = i + 1;
-	end
+        Amat(jj,2*N+2+i+1) = (rescomp(h(i,k), G(i,k), hr(i,k), h(i-1,k), G(i-1,k), hr(i-1,k), h(i+1,k), G(i+1,k), hr(i+1,k)+hjac, r(i), h(i,k-1), G(i,k-1), hr(i,k-1), h(i-2,k), h(i+2,k), equ) - rescomp(h(i,k), G(i,k), hr(i,k), h(i-1,k), G(i-1,k), hr(i-1,k), h(i+1,k), G(i+1,k), hr(i+1,k)-hjac, r(i), h(i,k-1), G(i,k-1), hr(i,k-1), h(i-2,k), h(i+2,k), equ))/(2.0*hjac);
+        Amat(jj,2*N+2+i-1) = (rescomp(h(i,k), G(i,k), hr(i,k), h(i-1,k), G(i-1,k), hr(i-1,k)+hjac, h(i+1,k), G(i+1,k), hr(i+1,k), r(i), h(i,k-1), G(i,k-1), hr(i,k-1), h(i-2,k), h(i+2,k), equ) - rescomp(h(i,k), G(i,k), hr(i,k), h(i-1,k), G(i-1,k), hr(i-1,k)-hjac, h(i+1,k), G(i+1,k), hr(i+1,k), r(i), h(i,k-1), G(i,k-1), hr(i,k-1), h(i-2,k), h(i+2,k), equ))/(2.0*hjac);
+      end
+      i = i + 1;
+    end
 
-	equ = 3; %%% Resin depth
-	i = 2;
-	for kk = (2*N+4):(3*N+2) %%% Loop over space
+    equ = 3; %%% Equation 3 - Resin depth
+    i = 2;
+    for kk = (2*N+4):(3*N+2) %%% Loop over space
       if (i == 2) %%% Semi-forward differences
         [res(kk,k)] = rescomp2(h(i,k), G(i,k), hr(i,k), h(i-1,k), G(i-1,k), hr(i-1,k), h(i+1,k), G(i+1,k), hr(i+1,k), r(i), h(i,k-1), G(i,k-1), hr(i,k-1), h(i+4,k), h(i+3,k), h(i+2,k), equ);
         Amat(kk,i) = (rescomp2(h(i,k)+hjac, G(i,k), hr(i,k), h(i-1,k), G(i-1,k), hr(i-1,k), h(i+1,k), G(i+1,k), hr(i+1,k), r(i), h(i,k-1), G(i,k-1), hr(i,k-1), h(i+4,k), h(i+3,k), h(i+2,k), equ) - rescomp2(h(i,k)-hjac, G(i,k), hr(i,k), h(i-1,k), G(i-1,k), hr(i-1,k), h(i+1,k), G(i+1,k), hr(i+1,k), r(i), h(i,k-1), G(i,k-1), hr(i,k-1), h(i+4,k), h(i+3,k), h(i+2,k), equ))/(2.0*hjac);
@@ -221,7 +221,7 @@ while ((t(k)*Tscale) <= dryt) %%% Loop over time
         Amat(kk,2*N+2+i+1) = (rescomp2(h(i,k), G(i,k), hr(i,k), h(i-1,k), G(i-1,k), hr(i-1,k), h(i+1,k), G(i+1,k), hr(i+1,k)+hjac, r(i), h(i,k-1), G(i,k-1), hr(i,k-1), h(i+4,k), h(i+3,k), h(i+2,k), equ) - rescomp2(h(i,k), G(i,k), hr(i,k), h(i-1,k), G(i-1,k), hr(i-1,k), h(i+1,k), G(i+1,k), hr(i+1,k)-hjac, r(i), h(i,k-1), G(i,k-1), hr(i,k-1), h(i+4,k), h(i+3,k), h(i+2,k), equ))/(2.0*hjac);
         Amat(kk,2*N+2+i-1) = (rescomp2(h(i,k), G(i,k), hr(i,k), h(i-1,k), G(i-1,k), hr(i-1,k)+hjac, h(i+1,k), G(i+1,k), hr(i+1,k), r(i), h(i,k-1), G(i,k-1), hr(i,k-1), h(i+4,k), h(i+3,k), h(i+2,k), equ) - rescomp2(h(i,k), G(i,k), hr(i,k), h(i-1,k), G(i-1,k), hr(i-1,k)-hjac, h(i+1,k), G(i+1,k), hr(i+1,k), r(i), h(i,k-1), G(i,k-1), hr(i,k-1), h(i+4,k), h(i+3,k), h(i+2,k), equ))/(2.0*hjac);
 
-	  elseif (i == N) %%% Semi-backward differences
+      elseif (i == N) %%% Semi-backward differences
         [res(kk,k)] = rescompn(h(i,k), G(i,k), hr(i,k), h(i-1,k), G(i-1,k), hr(i-1,k), h(i+1,k), G(i+1,k), hr(i+1,k), r(i), h(i,k-1), G(i,k-1), hr(i,k-1), h(i-4,k), h(i-3,k), h(i-2,k), equ);
         Amat(kk,i) = (rescompn(h(i,k)+hjac, G(i,k), hr(i,k), h(i-1,k), G(i-1,k), hr(i-1,k), h(i+1,k), G(i+1,k), hr(i+1,k), r(i), h(i,k-1), G(i,k-1), hr(i,k-1), h(i-4,k), h(i-3,k), h(i-2,k), equ)-rescompn(h(i,k)-hjac, G(i,k), hr(i,k), h(i-1,k), G(i-1,k), hr(i-1,k), h(i+1,k), G(i+1,k), hr(i+1,k), r(i), h(i,k-1), G(i,k-1), hr(i,k-1), h(i-4,k), h(i-3,k), h(i-2,k), equ))/(2.0*hjac);
         Amat(kk,i-1) = (rescompn(h(i,k), G(i,k), hr(i,k), h(i-1,k)+hjac, G(i-1,k), hr(i-1,k), h(i+1,k), G(i+1,k), hr(i+1,k), r(i), h(i,k-1), G(i,k-1), hr(i,k-1), h(i-4,k), h(i-3,k), h(i-2,k), equ)-rescompn(h(i,k), G(i,k), hr(i,k), h(i-1,k)-hjac, G(i-1,k), hr(i-1,k), h(i+1,k), G(i+1,k), hr(i+1,k), r(i), h(i,k-1), G(i,k-1), hr(i,k-1), h(i-4,k), h(i-3,k), h(i-2,k), equ))/(2.0*hjac);
@@ -238,23 +238,23 @@ while ((t(k)*Tscale) <= dryt) %%% Loop over time
         Amat(kk,2*N+2+i-1) = (rescompn(h(i,k), G(i,k), hr(i,k), h(i-1,k), G(i-1,k), hr(i-1,k)+hjac, h(i+1,k), G(i+1,k), hr(i+1,k), r(i), h(i,k-1), G(i,k-1), hr(i,k-1), h(i-4,k), h(i-3,k), h(i-2,k), equ)-rescompn(h(i,k), G(i,k), hr(i,k), h(i-1,k), G(i-1,k), hr(i-1,k)-hjac, h(i+1,k), G(i+1,k), hr(i+1,k), r(i), h(i,k-1), G(i,k-1), hr(i,k-1), h(i-4,k), h(i-3,k), h(i-2,k), equ))/(2.0*hjac);
         Amat(kk,2*N+2+i+1) = (rescompn(h(i,k), G(i,k), hr(i,k), h(i-1,k), G(i-1,k), hr(i-1,k), h(i+1,k), G(i+1,k), hr(i+1,k)+hjac, r(i), h(i,k-1), G(i,k-1), hr(i,k-1), h(i-4,k), h(i-3,k), h(i-2,k), equ)-rescompn(h(i,k), G(i,k), hr(i,k), h(i-1,k), G(i-1,k), hr(i-1,k), h(i+1,k), G(i+1,k), hr(i+1,k)-hjac, r(i), h(i,k-1), G(i,k-1), hr(i,k-1), h(i-4,k), h(i-3,k), h(i-2,k), equ))/(2.0*hjac);
 		
-	  else %%% Central differences
+      else %%% Central differences
         [res(kk,k)] = rescomp(h(i,k), G(i,k), hr(i,k), h(i-1,k), G(i-1,k), hr(i-1,k), h(i+1,k), G(i+1,k), hr(i+1,k), r(i), h(i,k-1), G(i,k-1), hr(i,k-1), h(i-2,k), h(i+2,k), equ);
         Amat(kk,i) = (rescomp(h(i,k)+hjac, G(i,k), hr(i,k), h(i-1,k), G(i-1,k), hr(i-1,k), h(i+1,k), G(i+1,k), hr(i+1,k), r(i), h(i,k-1), G(i,k-1), hr(i,k-1), h(i-2,k), h(i+2,k), equ) - rescomp(h(i,k)-hjac, G(i,k), hr(i,k), h(i-1,k), G(i-1,k), hr(i-1,k), h(i+1,k), G(i+1,k), hr(i+1,k), r(i), h(i,k-1), G(i,k-1), hr(i,k-1), h(i-2,k), h(i+2,k), equ))/(2.0*hjac);
-		Amat(kk,i+1) = (rescomp(h(i,k), G(i,k), hr(i,k), h(i-1,k), G(i-1,k), hr(i-1,k), h(i+1,k)+hjac, G(i+1,k), hr(i+1,k), r(i), h(i,k-1), G(i,k-1), hr(i,k-1), h(i-2,k), h(i+2,k), equ) - rescomp(h(i,k), G(i,k), hr(i,k), h(i-1,k), G(i-1,k), hr(i-1,k), h(i+1,k)-hjac, G(i+1,k), hr(i+1,k), r(i), h(i,k-1), G(i,k-1), hr(i,k-1), h(i-2,k), h(i+2,k), equ))/(2.0*hjac);
-		Amat(kk,i+2) = (rescomp(h(i,k), G(i,k), hr(i,k), h(i-1,k), G(i-1,k), hr(i-1,k), h(i+1,k), G(i+1,k), hr(i+1,k), r(i), h(i,k-1), G(i,k-1), hr(i,k-1), h(i-2,k), h(i+2,k)+hjac, equ) - rescomp(h(i,k), G(i,k), hr(i,k), h(i-1,k), G(i-1,k), hr(i-1,k), h(i+1,k), G(i+1,k), hr(i+1,k), r(i), h(i,k-1), G(i,k-1), hr(i,k-1), h(i-2,k), h(i+2,k)-hjac, equ))/(2.0*hjac);
-		Amat(kk,i-1) = (rescomp(h(i,k), G(i,k), hr(i,k), h(i-1,k)+hjac, G(i-1,k), hr(i-1,k), h(i+1,k), G(i+1,k), hr(i+1,k), r(i), h(i,k-1), G(i,k-1), hr(i,k-1), h(i-2,k), h(i+2,k), equ) - rescomp(h(i,k), G(i,k), hr(i,k), h(i-1,k)-hjac, G(i-1,k), hr(i-1,k), h(i+1,k), G(i+1,k), hr(i+1,k), r(i), h(i,k-1), G(i,k-1), hr(i,k-1), h(i-2,k), h(i+2,k), equ))/(2.0*hjac);
-		Amat(kk,i-2) = (rescomp(h(i,k), G(i,k), hr(i,k), h(i-1,k), G(i-1,k), hr(i-1,k), h(i+1,k), G(i+1,k), hr(i+1,k), r(i), h(i,k-1), G(i,k-1), hr(i,k-1), h(i-2,k)+hjac, h(i+2,k), equ) - rescomp(h(i,k), G(i,k), hr(i,k), h(i-1,k), G(i-1,k), hr(i-1,k), h(i+1,k), G(i+1,k), hr(i+1,k), r(i), h(i,k-1), G(i,k-1), hr(i,k-1), h(i-2,k)-hjac, h(i+2,k), equ))/(2.0*hjac);
+        Amat(kk,i+1) = (rescomp(h(i,k), G(i,k), hr(i,k), h(i-1,k), G(i-1,k), hr(i-1,k), h(i+1,k)+hjac, G(i+1,k), hr(i+1,k), r(i), h(i,k-1), G(i,k-1), hr(i,k-1), h(i-2,k), h(i+2,k), equ) - rescomp(h(i,k), G(i,k), hr(i,k), h(i-1,k), G(i-1,k), hr(i-1,k), h(i+1,k)-hjac, G(i+1,k), hr(i+1,k), r(i), h(i,k-1), G(i,k-1), hr(i,k-1), h(i-2,k), h(i+2,k), equ))/(2.0*hjac);
+        Amat(kk,i+2) = (rescomp(h(i,k), G(i,k), hr(i,k), h(i-1,k), G(i-1,k), hr(i-1,k), h(i+1,k), G(i+1,k), hr(i+1,k), r(i), h(i,k-1), G(i,k-1), hr(i,k-1), h(i-2,k), h(i+2,k)+hjac, equ) - rescomp(h(i,k), G(i,k), hr(i,k), h(i-1,k), G(i-1,k), hr(i-1,k), h(i+1,k), G(i+1,k), hr(i+1,k), r(i), h(i,k-1), G(i,k-1), hr(i,k-1), h(i-2,k), h(i+2,k)-hjac, equ))/(2.0*hjac);
+        Amat(kk,i-1) = (rescomp(h(i,k), G(i,k), hr(i,k), h(i-1,k)+hjac, G(i-1,k), hr(i-1,k), h(i+1,k), G(i+1,k), hr(i+1,k), r(i), h(i,k-1), G(i,k-1), hr(i,k-1), h(i-2,k), h(i+2,k), equ) - rescomp(h(i,k), G(i,k), hr(i,k), h(i-1,k)-hjac, G(i-1,k), hr(i-1,k), h(i+1,k), G(i+1,k), hr(i+1,k), r(i), h(i,k-1), G(i,k-1), hr(i,k-1), h(i-2,k), h(i+2,k), equ))/(2.0*hjac);
+        Amat(kk,i-2) = (rescomp(h(i,k), G(i,k), hr(i,k), h(i-1,k), G(i-1,k), hr(i-1,k), h(i+1,k), G(i+1,k), hr(i+1,k), r(i), h(i,k-1), G(i,k-1), hr(i,k-1), h(i-2,k)+hjac, h(i+2,k), equ) - rescomp(h(i,k), G(i,k), hr(i,k), h(i-1,k), G(i-1,k), hr(i-1,k), h(i+1,k), G(i+1,k), hr(i+1,k), r(i), h(i,k-1), G(i,k-1), hr(i,k-1), h(i-2,k)-hjac, h(i+2,k), equ))/(2.0*hjac);
 		
         Amat(kk,N+1+i) = (rescomp(h(i,k), G(i,k)+hjac, hr(i,k), h(i-1,k), G(i-1,k), hr(i-1,k), h(i+1,k), G(i+1,k), hr(i+1,k), r(i), h(i,k-1), G(i,k-1), hr(i,k-1), h(i-2,k), h(i+2,k), equ) - rescomp(h(i,k), G(i,k)-hjac, hr(i,k), h(i-1,k), G(i-1,k), hr(i-1,k), h(i+1,k), G(i+1,k), hr(i+1,k), r(i), h(i,k-1), G(i,k-1), hr(i,k-1), h(i-2,k), h(i+2,k), equ))/(2.0*hjac);
-		Amat(kk,N+1+i+1) = (rescomp(h(i,k), G(i,k), hr(i,k), h(i-1,k), G(i-1,k), hr(i-1,k), h(i+1,k), G(i+1,k)+hjac, hr(i+1,k), r(i), h(i,k-1), G(i,k-1), hr(i,k-1), h(i-2,k), h(i+2,k), equ) - rescomp(h(i,k), G(i,k), hr(i,k), h(i-1,k), G(i-1,k), hr(i-1,k), h(i+1,k), G(i+1,k)-hjac, hr(i+1,k), r(i), h(i,k-1), G(i,k-1), hr(i,k-1), h(i-2,k), h(i+2,k), equ))/(2.0*hjac);
-		Amat(kk,N+1+i-1) = (rescomp(h(i,k), G(i,k), hr(i,k), h(i-1,k), G(i-1,k)+hjac, hr(i-1,k), h(i+1,k), G(i+1,k), hr(i+1,k), r(i), h(i,k-1), G(i,k-1), hr(i,k-1), h(i-2,k), h(i+2,k), equ) - rescomp(h(i,k), G(i,k), hr(i,k), h(i-1,k), G(i-1,k)-hjac, hr(i-1,k), h(i+1,k), G(i+1,k), hr(i+1,k), r(i), h(i,k-1), G(i,k-1), hr(i,k-1), h(i-2,k), h(i+2,k), equ))/(2.0*hjac);
+        Amat(kk,N+1+i+1) = (rescomp(h(i,k), G(i,k), hr(i,k), h(i-1,k), G(i-1,k), hr(i-1,k), h(i+1,k), G(i+1,k)+hjac, hr(i+1,k), r(i), h(i,k-1), G(i,k-1), hr(i,k-1), h(i-2,k), h(i+2,k), equ) - rescomp(h(i,k), G(i,k), hr(i,k), h(i-1,k), G(i-1,k), hr(i-1,k), h(i+1,k), G(i+1,k)-hjac, hr(i+1,k), r(i), h(i,k-1), G(i,k-1), hr(i,k-1), h(i-2,k), h(i+2,k), equ))/(2.0*hjac);
+        Amat(kk,N+1+i-1) = (rescomp(h(i,k), G(i,k), hr(i,k), h(i-1,k), G(i-1,k)+hjac, hr(i-1,k), h(i+1,k), G(i+1,k), hr(i+1,k), r(i), h(i,k-1), G(i,k-1), hr(i,k-1), h(i-2,k), h(i+2,k), equ) - rescomp(h(i,k), G(i,k), hr(i,k), h(i-1,k), G(i-1,k)-hjac, hr(i-1,k), h(i+1,k), G(i+1,k), hr(i+1,k), r(i), h(i,k-1), G(i,k-1), hr(i,k-1), h(i-2,k), h(i+2,k), equ))/(2.0*hjac);
 		
         Amat(kk,2*N+2+i) = (rescomp(h(i,k), G(i,k), hr(i,k)+hjac, h(i-1,k), G(i-1,k), hr(i-1,k), h(i+1,k), G(i+1,k), hr(i+1,k), r(i), h(i,k-1), G(i,k-1), hr(i,k-1), h(i-2,k), h(i+2,k), equ) - rescomp(h(i,k), G(i,k), hr(i,k)-hjac, h(i-1,k), G(i-1,k), hr(i-1,k), h(i+1,k), G(i+1,k), hr(i+1,k), r(i), h(i,k-1), G(i,k-1), hr(i,k-1), h(i-2,k), h(i+2,k), equ))/(2.0*hjac);
-		Amat(kk,2*N+2+i+1) = (rescomp(h(i,k), G(i,k), hr(i,k), h(i-1,k), G(i-1,k), hr(i-1,k), h(i+1,k), G(i+1,k), hr(i+1,k)+hjac, r(i), h(i,k-1), G(i,k-1), hr(i,k-1), h(i-2,k), h(i+2,k), equ) - rescomp(h(i,k), G(i,k), hr(i,k), h(i-1,k), G(i-1,k), hr(i-1,k), h(i+1,k), G(i+1,k), hr(i+1,k)-hjac, r(i), h(i,k-1), G(i,k-1), hr(i,k-1), h(i-2,k), h(i+2,k), equ))/(2.0*hjac);
-		Amat(kk,2*N+2+i-1) = (rescomp(h(i,k), G(i,k), hr(i,k), h(i-1,k), G(i-1,k), hr(i-1,k)+hjac, h(i+1,k), G(i+1,k), hr(i+1,k), r(i), h(i,k-1), G(i,k-1), hr(i,k-1), h(i-2,k), h(i+2,k), equ) - rescomp(h(i,k), G(i,k), hr(i,k), h(i-1,k), G(i-1,k), hr(i-1,k)-hjac, h(i+1,k), G(i+1,k), hr(i+1,k), r(i), h(i,k-1), G(i,k-1), hr(i,k-1), h(i-2,k), h(i+2,k), equ))/(2.0*hjac);
-	  end	
-	  i = i + 1;    
+        Amat(kk,2*N+2+i+1) = (rescomp(h(i,k), G(i,k), hr(i,k), h(i-1,k), G(i-1,k), hr(i-1,k), h(i+1,k), G(i+1,k), hr(i+1,k)+hjac, r(i), h(i,k-1), G(i,k-1), hr(i,k-1), h(i-2,k), h(i+2,k), equ) - rescomp(h(i,k), G(i,k), hr(i,k), h(i-1,k), G(i-1,k), hr(i-1,k), h(i+1,k), G(i+1,k), hr(i+1,k)-hjac, r(i), h(i,k-1), G(i,k-1), hr(i,k-1), h(i-2,k), h(i+2,k), equ))/(2.0*hjac);
+        Amat(kk,2*N+2+i-1) = (rescomp(h(i,k), G(i,k), hr(i,k), h(i-1,k), G(i-1,k), hr(i-1,k)+hjac, h(i+1,k), G(i+1,k), hr(i+1,k), r(i), h(i,k-1), G(i,k-1), hr(i,k-1), h(i-2,k), h(i+2,k), equ) - rescomp(h(i,k), G(i,k), hr(i,k), h(i-1,k), G(i-1,k), hr(i-1,k)-hjac, h(i+1,k), G(i+1,k), hr(i+1,k), r(i), h(i,k-1), G(i,k-1), hr(i,k-1), h(i-2,k), h(i+2,k), equ))/(2.0*hjac);
+      end	
+      i = i + 1;    
     end
     
     res(1,k) = - 3.0*h(1,k) + 4.0*h(2,k) - 1.0*h(3,k); %%% No-flux boundary condition (N=0)
@@ -284,21 +284,21 @@ while ((t(k)*Tscale) <= dryt) %%% Loop over time
     Amat(3*N+3,3*N+2) = -4.0;
     Amat(3*N+3,3*N+1) = 1.0;		
 
-	dsol = Amat\res(:,k); % Solve linear system
+    dsol = Amat\res(:,k); %%% Solve the linear system
 	
     for i = 1:N+1  %%% Update solution
-	  h(i,k) = h(i,k) - dsol(i);
-	  G(i,k) = G(i,k) - dsol(N+1+i);
-	  hr(i,k) = hr(i,k) - dsol(2*N+2+i);
-	  c(i,k) = hr(i,k)./h(i,k);
-	  eoi(i,k) = eo*(1.0-erf((hr(i,k)./h(i,k)-0.7)*10))/2.0;
+      h(i,k) = h(i,k) - dsol(i);
+      G(i,k) = G(i,k) - dsol(N+1+i);
+      hr(i,k) = hr(i,k) - dsol(2*N+2+i);
+      c(i,k) = hr(i,k)./h(i,k);
+      eoi(i,k) = eo*(1.0-erf((hr(i,k)./h(i,k)-0.7)*10))/2.0;
     end 
     
-	newtonerror = 0.0;
+    newtonerror = 0.0;
     for i = 1:3*N+3
-      newtonerror = newtonerror + res(i,k)^2;
+      newtonerror = newtonerror + res(i,k)^2; %%% Compute Newton
     end
-	newtonerror
+    newtonerror
     
   end
 %%%
@@ -311,9 +311,9 @@ while ((t(k)*Tscale) <= dryt) %%% Loop over time
   if (k == 2)
     subplot (1, 2, 1)
     p = plot (r*L*10.0, h(:,k)*Ht*10.0, 'linewidth', 1);
-	hold on
+    hold on
 %    p2 = plot (r*L*10.0, hr(:,k)*Ht*10.0, 'linewidth', 1);
-	grid on;
+    grid on;
     axis ([0, 10*L*10.0, 0, 0.10001], 'square');
     xlabel ('r (mm)');
     ylabel ('z (mm)');
@@ -321,7 +321,7 @@ while ((t(k)*Tscale) <= dryt) %%% Loop over time
 	
     subplot (1, 2, 2)
     pp = plot (r*L*10.0, G(:,k)/G0, 'linewidth', 1);
-	grid on;
+    grid on;
     axis ([0, 10*L*10.0, 0, 1.0], 'square');
     xlabel ('r (mm)');
     ylabel ('G/G_{init}');
@@ -339,7 +339,7 @@ while ((t(k)*Tscale) <= dryt) %%% Loop over time
     set (pp, 'xdata', r*L*10.0);
     set (pp, 'ydata', G(:,k)/G0);
 	
-	delete(htext);
+    delete(htext);
     htext = text (1.8, 0.9, num2str (t(k)*Tscale,2));
   end
   fname = sprintf ('img%03i.png', k);
@@ -348,8 +348,8 @@ while ((t(k)*Tscale) <= dryt) %%% Loop over time
 %%%
 %%% Update time step
 %%% 
-dt = dt*1.1;
+  dt = dt*1.1;
 
 end
 
-toc
+toc %%% Solution time
