@@ -1,3 +1,9 @@
 # crater-defect-formation
 A mathematical model for crater defect formation in a drying paint layer as presented by [Evans et al., J. Colloid Interface Sci., 2000](https://www.sciencedirect.com/science/article/abs/pii/S0021979700968772). The craters are created due to surface-tension-gradient-driven flow as a result of a preexisting layer of surfactant on the paint. The equations are discretized using the Finite Differences Method (FDM) and integrated in time using the implicit Euler method.
-![img055](https://user-images.githubusercontent.com/29924262/119467949-af3c5e80-bd4e-11eb-9760-a97712f45e7b.png)
+
+## Run example
+Launch "crater_model_imp.m" from Octave console.
+
+## Results example
+![119467949-af3c5e80-bd4e-11eb-9760-a97712f45e7b2](https://user-images.githubusercontent.com/29924262/119612991-3946fe80-be05-11eb-83a2-49f2c5480237.png)
+
