@@ -41,7 +41,6 @@ dryt = 15; %%% Simulation time
 N = 200; %%% Number of nodes
 rend = 12.0; %%% max r
 r = linspace(0,rend,N+1)';
-%r = rend*pow2(0:-0.1:-10)';
 dr = rend/real(N);
 hjac = 1.0e-4*dr; %%% Used for Jacobian calculation
 
@@ -62,7 +61,7 @@ for i = 1:N+1
   h(i,1) = 1.0; %%% Film thickness
   c(i,1) = co; %%% Resin concentration
   hr(i,1) = c(i,1)*h(i,1); %%% Resin depth
-%  G(i,1) = 1.0/(0.1+(r(i)/L)); %%% Initial surfactant concentration
+%  G(i,1) = 1.0/(0.1+(r(i)/L)); %%% Initial surfactant concentration (given by a rational function)
   G(i,1) = (1.0-erf((r(i)-1.0)*2.5))/2.0; %%% Initial surfactant concentration (given by an error function)
 %  G(i,1) =  G0*exp(-(r(i)/L)^2); %%% Initial surfactant concentration (given by an exponential function)
 end
